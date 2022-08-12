@@ -98,21 +98,19 @@ class _AutoEncoderInferenceWorker(InferenceWorker):
         """
         data = batch.get_meta(batch.meta.df.columns.intersection(self._feature_columns))
 
-        explain_df = pd.DataFrame(np.empty((batch.count, 3), dtype=object),
-                                  columns=["num_col_max_loss", "bin_col_max_loss", "cat_col_max_loss"])
-        if batch.model is not None:
-            mse_loss, bce_loss, cce_loss, rloss_scores = batch.model.get_anomaly_score(data)
-            num_names, cat_names, bin_names = batch.model.return_feature_names()
-            vi_df = batch.model.get_variable_importance(num_names,
-                                                        cat_names,
-                                                        bin_names,
-                                                        mse_loss,
-                                                        bce_loss,
-                                                        cce_loss,
-                                                        data)
-            for col in vi_df.columns:
-                explain_df[col] = vi_df[col]
+        explain_cols = [x + "_z_loss" for x in self._feature_columns] + ["max_abs_z", "mean_abs_z"]
+        explain_df = pd.DataFrame(np.empty((batch.count, (len(self._feature_columns)+2)), dtype=object), columns=explain_cols)
 
+        if batch.model is not None:
+            rloss_scores = batch.model.get_anomaly_score(data)[3]
+
+            results = batch.model.get_results(data, return_abs=True)
+            scaled_z_scores = [col for col in results.columns if col.endswith('_z_loss')]
+            scaled_z_scores.extend(['max_abs_z', 'mean_abs_z'])
+            scaledz_df = results[scaled_z_scores]
+            for col in scaledz_df.columns:
+                explain_df[col] = scaledz_df[col]
+            
             zscores = (rloss_scores - batch.train_scores_mean) / batch.train_scores_std
             rloss_scores = rloss_scores.reshape((batch.count, 1))
             zscores = np.absolute(zscores)

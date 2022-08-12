@@ -105,7 +105,6 @@ class _UserModelManager(object):
             progress_bar=False)
 
         logger.debug("Training AE model for user: '%s'...", self._user_id)
-        # train_df = combined_df[combined_df.columns.intersection(self._feature_columns)]
         model.fit(train_df, epochs=self._epochs)
         train_loss_scores = model.get_anomaly_score(train_df)[3]
         scores_mean = train_loss_scores.mean()
@@ -267,7 +266,7 @@ class TrainAEStage(MultiMessageStage):
 
                     # Derive features here
                     df = self._source_stage_class.derive_features(df, self._feature_columns)
-                    df = df.dropna(thresh=2, axis=1, how='all')
+                    df = df.fillna("nan")
 
                     if len(df.columns) >= self._config.ae.min_train_features:
                         self._user_models[user_id].train(df)
